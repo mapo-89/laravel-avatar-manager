@@ -18,7 +18,7 @@ class AvatarController
             return Response::file(Storage::disk('public')->path($user->profile_photo_path));
         }
 
-        $defaultPath = public_path(config('avatar.default_avatar', 'vendor/avatar-manager/default.png'));
+        $defaultPath = public_path(config('avatar-manager.default_avatar', 'vendor/avatar-manager/default.png'));
         return Response::file($defaultPath);
     }
 }
