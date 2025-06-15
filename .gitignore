@@ -1,7 +1,6 @@
 /vendor
-/tests
 .env
 /.fleet
 /.idea
 /.vscode
-
+composer.lock
