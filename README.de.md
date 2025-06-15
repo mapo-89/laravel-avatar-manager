@@ -44,10 +44,38 @@ php artisan vendor:publish --tag=avatar-manager-assets
 
 ```
 
-### Testen
+### Testing
+
+Um das Paket flexibel und testbar zu halten, verwendet der AvatarManager ein Interface für den Zugriff auf User-Daten:
+`Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface`
+
+Für Tests wird die Test-User-Klasse über `TestUserProvider` gebunden. 
+
+#### Produktivbetrieb
+
+Im Service Provider bindet das Paket standardmäßig die echte User-Klasse (z.B. App\Models\User):
+
+```php
+public function register()
+{
+    $this->app->bind(
+        \Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface::class,
+        \Mapo89\LaravelAvatarManager\Services\UserProvider::class
+    );
+}
+```
+Die UserProvider-Klasse implementiert die Logik, um User per Email-Hash zu finden.
+
+#### Tests ausführen
+
+Die Tests können mit verschiedenen Befehlen ausgeführt werden:
 
 ```bash
 composer test
+
+./vendor/bin/phpunit --testdox --stderr
+
+./vendor/bin/pest
 ```
 
 ### Changelog
