@@ -3,6 +3,8 @@
 namespace Mapo89\LaravelAvatarManager;
 
 use Illuminate\Support\ServiceProvider;
+use Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface;
+use Mapo89\LaravelAvatarManager\Services\UserProvider;
 
 class AvatarManagerServiceProvider extends ServiceProvider
 {
@@ -50,6 +52,11 @@ class AvatarManagerServiceProvider extends ServiceProvider
      */
     public function register()
     {
+        //Service provider binds the interface
+        $this->app->bind(
+            UserProviderInterface::class,
+            UserProvider::class
+        );
         // Automatically apply the package configuration
         $this->mergeConfigFrom(__DIR__.'/../config/config.php', 'avatar-manager');
 

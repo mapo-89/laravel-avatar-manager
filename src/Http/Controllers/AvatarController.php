@@ -4,15 +4,19 @@ namespace Mapo89\LaravelAvatarManager\Http\Controllers;
 
 use Illuminate\Support\Facades\Response;
 use Illuminate\Support\Facades\Storage;
-use App\Models\User;
+use Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface;
 
 class AvatarController
 {
+    protected $userProvider;
+
+    public function __construct(UserProviderInterface $userProvider)
+    {
+        $this->userProvider = $userProvider;
+    }
     public function show($hash)
     {
-        $user = User::all()->first(function ($user) use ($hash) {
-            return md5(strtolower(trim($user->email))) === $hash;
-        });
+        $user = $this->userProvider->findByEmailHash($hash);
 
         if ($user && $user->profile_photo_path && Storage::disk('public')->exists($user->profile_photo_path)) {
             return Response::file(Storage::disk('public')->path($user->profile_photo_path));
