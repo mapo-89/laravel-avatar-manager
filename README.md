@@ -3,6 +3,7 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
 [![Total Downloads](https://img.shields.io/packagist/dt/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
 ![GitHub Actions](https://github.com/mapo-89/laravel-avatar-manager/actions/workflows/main.yml/badge.svg)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **Laravel Avatar Manager** is a lightweight, self-hosted Laravel package for managing user avatars - with support for Gravatar-compatible hashes, local storage and easy integration into existing projects.
 
@@ -15,8 +16,61 @@
 - Avatar URLs based on MD5(Email), as with Gravatar
 - Fallback to default avatars
 - Seamless integration with the Laravel user model
+- Local storage of uploaded avatars
+- API-based avatar upload using email + API key (no login required)
 - SQLite compatible ✅
 
+## 🚀 API Avatar Upload
+
+You can now upload avatars via a public API without requiring user registration. Useful for:
+
+- CLI scripts
+- External systems
+- 3rd-party services
+
+### Endpoint
+
+```http
+POST /api/avatars/upload
+```
+
+#### Headers
+
+```http
+X-API-KEY: your-api-key
+```
+
+#### Payload
+
+```json
+{
+  "email": "user@example.com",
+  "avatar": (image file)
+}
+```
+
+The uploaded image will be saved to:
+
+```bash
+storage/app/public/avatars/{md5(email)}.jpg
+```
+
+### Configuration
+
+Add one or more API keys to your config:
+
+```php
+// config/avatar-manager.php
+'api_keys' => [
+    env('AVATAR_API_KEY'),
+],
+```
+
+And in your .env file:
+
+```php
+AVATAR_API_KEY=your-api-key
+```
 
 ## 🛠️ Installation
 
