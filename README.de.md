@@ -3,6 +3,7 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
 [![Total Downloads](https://img.shields.io/packagist/dt/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
 ![GitHub Actions](https://github.com/mapo-89/laravel-avatar-manager/actions/workflows/main.yml/badge.svg)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 **Laravel Avatar Manager** ist ein leichtgewichtiges, self-hosted Laravel-Package zum Verwalten von Benutzer-Avataren – mit Unterstützung für Gravatar-kompatible Hashes, lokale Speicherung und einfache Integration in bestehende Projekte.
 
@@ -12,11 +13,64 @@
 
 ## ✨ Features
 
-- Avatar-URLs auf Basis von MD5(Email), wie bei Gravatar
-- Fallback auf Default-Avatare
-- Nahtlose Integration mit dem Laravel-User-Model
-- SQLite-kompatibel ✅
+- Avatar-URLs basierend auf MD5(Email), wie bei Gravatar
+- Fallback auf Standard-Avatare
+- Nahtlose Integration in das Laravel-Benutzermodell
+- Lokale Speicherung von hochgeladenen Avataren
+- API-basierter Avatar-Upload mit E-Mail + API-Schlüssel (keine Anmeldung erforderlich)
+- SQLite-kompatibel ✅.
 
+## 🚀 API-Avatar-Upload
+
+Es ist jetzt möglich, Avatare über eine öffentliche API hochzuladen, ohne dass eine Benutzerregistrierung erforderlich ist. Nützlich für:
+
+- CLI-Skripte
+- Externe Systeme
+- Dienste von Drittanbietern
+
+### Endpunkt
+
+```http
+POST /api/avatars/upload
+```
+
+#### Headers
+
+```http
+X-API-KEY: ihr-api-key
+```
+
+#### Payload
+
+```json
+{
+ "email": "user@example.com",
+ "avatar": (Bilddatei)
+}
+```
+
+Das hochgeladene Bild wird gespeichert in:
+
+```bash
+storage/app/public/avatars/{md5(email)}.jpg
+```
+
+### Konfiguration
+
+Einen oder mehrere API-Schlüssel zur Konfigurationsdatei hinzufügen:
+
+```php
+// config/avatar-manager.php
+'api_keys' => [
+ env('AVATAR_API_KEY'),
+],
+```
+
+Und in der .env Datei:
+
+```php
+AVATAR_API_KEY=your-api-key
+```
 
 ## 🛠️ Installation
 
@@ -33,7 +87,7 @@ composer require mapo-89/laravel-avatar-manager
 php artisan vendor:publish --provider="Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider"
 php artisan storage:link
 ```
-Du kannst auch gezielt veröffentlichen:
+Es kann auch gezielt veröffentlicht werden:
 
 ```bash
 # Nur Konfiguration

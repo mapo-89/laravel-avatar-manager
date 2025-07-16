@@ -4,6 +4,7 @@ namespace Mapo89\LaravelAvatarManager;
 
 use Illuminate\Support\ServiceProvider;
 use Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface;
+use Mapo89\LaravelAvatarManager\Http\Middleware\ApiKeyAuth;
 use Mapo89\LaravelAvatarManager\Services\UserProvider;
 
 class AvatarManagerServiceProvider extends ServiceProvider
@@ -20,6 +21,9 @@ class AvatarManagerServiceProvider extends ServiceProvider
         // $this->loadViewsFrom(__DIR__.'/../resources/views', 'avatar-manager');
         // $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadRoutesFrom(__DIR__.'/routes/web.php');
+        $this->loadRoutesFrom(__DIR__.'/routes/api.php');
+
+        $this->app['router']->aliasMiddleware('avatar-manager.api_key', ApiKeyAuth::class);
 
         if ($this->app->runningInConsole()) {
              // Publishing config.
