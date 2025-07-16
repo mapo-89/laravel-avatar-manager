@@ -3,20 +3,33 @@
 namespace Mapo89\LaravelAvatarManager\Tests\Feature;
 
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Storage;
+use Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider;
 use Orchestra\Testbench\TestCase;
 
 class AvatarApiUploadTest extends TestCase
 {
+     protected function getPackageProviders($app)
+    {
+        return [
+            AvatarManagerServiceProvider::class,
+        ];
+    }
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        Storage::fake('public');
+        Config::set('avatar-manager.api_keys', ['test-api-key']);
+    }
     public function test_avatar_upload_with_valid_api_key()
     {
-        Storage::fake('public');
-
-        $response = $this->postJson('/api/avatars/upload', [
+         $response = $this->withHeaders([
+            'X-API-KEY' => 'test-api-key',
+        ])->postJson('/api/avatars/upload', [
             'email' => 'user@example.com',
             'avatar' => UploadedFile::fake()->image('avatar.jpg'),
-        ], [
-            'X-API-KEY' => config('avatar-manager.api_keys')[0],
         ]);
 
         $response->assertStatus(200);
