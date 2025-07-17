@@ -20,34 +20,27 @@
 - API-basierter Avatar-Upload mit E-Mail + API-Schlüssel (keine Anmeldung erforderlich)
 - SQLite-kompatibel ✅.
 
-## 🚀 API-Avatar-Upload
+## 🚀 API Avatar Upload Endpunkt
 
-Es ist jetzt möglich, Avatare über eine öffentliche API hochzuladen, ohne dass eine Benutzerregistrierung erforderlich ist. Nützlich für:
+Das Paket bietet einen optionalen Upload-Endpunkt, der keine Benutzerregistrierung erfordert.
 
-- CLI-Skripte
-- Externe Systeme
-- Dienste von Drittanbietern
+### `POST /api/avatars/upload`
 
-### Endpunkt
+**Kopfzeilen:**
+- `X-API-KEY`: Ein gültiger API-Schlüssel, definiert in `config/avatar-manager.php`
 
-```http
-POST /api/avatars/upload
-```
+**Körper-Parameter:**
+- `email` (string, erforderlich) - Die E-Mail-Adresse, die zur Berechnung des Avatar-Hashes verwendet wird
+- `avatar` (image, erforderlich) - Das hochgeladene Avatar-Bild (max. 2MB)
 
-#### Headers
+**Antwort:**
 
-```http
-X-API-KEY: ihr-api-key
-```
+- `200 OK`: Avatar erfolgreich hochgeladen
+- `401 Unauthorized`: Fehlender oder ungültiger API-Schlüssel
+- `422 Unprocessable Entity`: Validierung fehlgeschlagen (z.B. ungültige E-Mail oder Bild)
+-  `409 Conflict`: Upload abgebrochen - Benutzer hat bereits ein bestehendes Profilfoto
 
-#### Payload
-
-```json
-{
- "email": "user@example.com",
- "avatar": (Bilddatei)
-}
-```
+> ℹ️ Wenn ein Benutzer in Ihrem System existiert und bereits einen `profile_photo_path` eingestellt hat, wird die API einen neuen Avatar-Upload über den Endpunkt ablehnen, um unbeabsichtigte Überschreibungen zu vermeiden.
 
 Das hochgeladene Bild wird gespeichert in:
 
@@ -84,7 +77,7 @@ composer require mapo-89/laravel-avatar-manager
 ## ⚙️ Konfiguration
 
 ```bash
-php artisan vendor:publish --provider="Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider"
+php artisan vendor:publish --provider=`Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider`
 php artisan storage:link
 ```
 Es kann auch gezielt veröffentlicht werden:

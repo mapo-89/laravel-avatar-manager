@@ -20,34 +20,27 @@
 - API-based avatar upload using email + API key (no login required)
 - SQLite compatible ✅
 
-## 🚀 API Avatar Upload
+## 🚀 API Avatar Upload Endpoint
 
-You can now upload avatars via a public API without requiring user registration. Useful for:
+The package provides an optional upload endpoint without requiring user registration. 
 
-- CLI scripts
-- External systems
-- 3rd-party services
+### `POST /api/avatars/upload`
 
-### Endpoint
+**Headers:**
+- `X-API-KEY`: A valid API key defined in `config/avatar-manager.php`
 
-```http
-POST /api/avatars/upload
-```
+**Body Parameters:**
+- `email` (string, required) – The email address used to compute the avatar hash
+- `avatar` (image, required) – The uploaded avatar image (max 2MB)
 
-#### Headers
+**Response:**
 
-```http
-X-API-KEY: your-api-key
-```
+- `200 OK`: Avatar successfully uploaded  
+- `401 Unauthorized`: Missing or invalid API key  
+- `422 Unprocessable Entity`: Validation failed (e.g. invalid email or image)  
+- `409 Conflict`: Upload aborted – user already has an existing profile photo  
 
-#### Payload
-
-```json
-{
-  "email": "user@example.com",
-  "avatar": (image file)
-}
-```
+> ℹ️ If a user exists in your system and already has a `profile_photo_path` set, the API will reject a new avatar upload via the endpoint to avoid unintended overrides.
 
 The uploaded image will be saved to:
 
