@@ -2,6 +2,16 @@
 
 All notable changes to `laravel-avatar-manager` will be documented in this file
 
+## 1.2.1 - 2025-07-17
+
+### Added
+- API: Prevent avatar upload if user already has a `profile_photo_path`
+- Return `409 Conflict` with descriptive message when upload is blocked
+- New test case: `avatar_upload_fails_if_user_has_existing_profile_photo`
+
+### Changed
+- Updated README with behavior for conflict on existing profile photos
+
 ## 1.2.0 - 2025-07-16
 
 ### Added
