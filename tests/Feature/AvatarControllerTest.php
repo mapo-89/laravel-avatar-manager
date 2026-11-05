@@ -1,96 +1,85 @@
 <?php
 
-namespace Tests\Feature;
+namespace Mapo89\LaravelAvatarManager\Tests\Feature;
 
-use Illuminate\Database\Schema\Blueprint;
-use Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface;
-use Mapo89\LaravelAvatarManager\Tests\Services\TestUserProvider;
-use Orchestra\Testbench\TestCase as TestbenchTestCase;
+use Mapo89\LaravelAvatarManager\Tests\Models\User;
+use Mapo89\LaravelAvatarManager\Tests\TestCase;
 
-class AvatarControllerTest extends TestbenchTestCase
+class AvatarControllerTest extends TestCase
 {
-    use RefreshDatabase;
-
-    protected function getPackageProviders($app)
+    private function avatarUrl(): string
     {
-        return [
-            AvatarManagerServiceProvider::class,
-        ];
-    }
-    protected function setUp(): void
-    {
-        parent::setUp();
-
-         $this->app->bind(
-    UserProviderInterface::class,
-    TestUserProvider::class
-        );
-
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->string('email')->unique();
-            $table->string('profile_photo_path')->nullable();
-            $table->timestamps();
-        });
-
-        // Dummy files for avatar
-        Storage::fake('public');
-        Storage::disk('public')->put('avatars/demo.png', 'dummy-avatar-content');
-
-        // Default-Avatar anlegen
-        File::ensureDirectoryExists(public_path('vendor/avatar-manager'));
-        File::put(public_path('vendor/avatar-manager/default.png'), 'fallback-content');
+        return '/avatar/'.md5('user@example.com');
     }
 
-    public function test_show_returns_avatar_file_if_exists_in_avatars_folder()
+    public function test_show_returns_avatar_file_if_exists_in_avatars_folder(): void
     {
-        // Generiere Fake-Bild
-        $file = UploadedFile::fake()->image('testavatar.jpg');
+        $file = UploadedFile::fake()->image('avatar.jpg');
+        Storage::disk('public')->put('avatars/'.md5('user@example.com').'.jpg', file_get_contents($file->getRealPath()));
 
-        // Kopiere Bild in „avatars/“-Ordner
-        Storage::disk('public')->put('avatars/testhash.jpg', file_get_contents($file->getRealPath()));
+        $response = $this->get($this->avatarUrl());
 
-        $response = $this->get('/avatar/testhash');
-
-        $response->assertStatus(200);
-        $response->assertHeader('content-type', 'image/jpeg');
+        $response->assertOk()->assertHeader('content-type', 'image/jpeg');
+        $this->assertSame(file_get_contents($file->getRealPath()), $response->streamedContent());
     }
 
-    public function test_show_returns_user_profile_photo_if_no_avatar_found()
+    public function test_managed_photo_takes_precedence_over_stale_api_upload(): void
     {
-        $fakeUser = (object) [
-            'profile_photo_path' => 'profile_photos/userphoto.jpg',
-        ];
+        User::create(['email' => 'user@example.com', 'profile_photo_path' => 'profile-photos/current.jpg']);
+        Storage::disk('public')->put('profile-photos/current.jpg', 'current-photo');
+        Storage::disk('public')->put('avatars/'.md5('user@example.com').'.jpg', 'stale-api-photo');
 
-         // Generiere Fake-Bild
-        $file = UploadedFile::fake()->image('userphoto.jpg');
-        Storage::disk('public')->put('profile_photos/userphoto.jpg', file_get_contents($file->getRealPath()));
-
-        $this->app->instance(UserProviderInterface::class, new class($fakeUser) implements UserProviderInterface {
-            private $user;
-            public function __construct($user) { $this->user = $user; }
-            public function findByEmailHash($hash) { return $this->user; }
-        });
-
-        $response = $this->get('/avatar/testhash');
-
-        $response->assertStatus(200);
-        $response->assertHeader('content-type', 'image/jpeg');
+        $this->assertSame('current-photo', $this->get($this->avatarUrl())->assertOk()->streamedContent());
     }
 
-    public function test_show_returns_default_avatar_if_none_found()
+    public function test_show_returns_bundled_default_without_publishing_assets(): void
     {
-        $response = $this->get('/avatar/nonexistenthash');
+        config(['avatar-manager.default_avatar' => 'missing-default.png']);
 
-        $response->assertStatus(200); // Fallback-
-        $actual = file_get_contents($response->getFile()->getPathname());
-        $this->assertEquals('fallback-content', $actual);
+        $response = $this->get($this->avatarUrl())->assertOk()->assertHeader('content-type', 'image/png');
+
+        $this->assertSame(realpath(__DIR__.'/../../resources/assets/default.png'), $response->getFile()->getPathname());
+    }
+
+    public function test_configured_default_is_used(): void
+    {
+        $path = public_path('avatar-manager-test-default.png');
+        file_put_contents($path, file_get_contents(__DIR__.'/../../resources/assets/default.png'));
+        config(['avatar-manager.default_avatar' => 'avatar-manager-test-default.png']);
+
+        try {
+            $this->assertSame($path, $this->get($this->avatarUrl())->assertOk()->getFile()->getPathname());
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_uppercase_hash_is_supported(): void
+    {
+        Storage::disk('public')->put('avatars/'.md5('user@example.com').'.png', 'avatar');
+
+        $this->assertSame('avatar', $this->get('/avatar/'.strtoupper(md5('user@example.com')))->assertOk()->streamedContent());
+    }
+
+    public function test_invalid_hashes_do_not_reach_avatar_lookup(): void
+    {
+        $this->get('/avatar/invalid-hash')->assertNotFound();
+        $this->get('/avatar/'.str_repeat('z', 32))->assertNotFound();
+        $this->get('/avatar/../secret')->assertNotFound();
+    }
+
+    public function test_configured_storage_disks_are_respected(): void
+    {
+        Storage::fake('avatars');
+        Storage::fake('profiles');
+        config(['avatar-manager.disk' => 'avatars', 'avatar-manager.profile_photo_disk' => 'profiles']);
+        Storage::disk('avatars')->put('avatars/'.md5('user@example.com').'.png', 'api-image');
+        $this->assertSame('api-image', $this->get($this->avatarUrl())->assertOk()->streamedContent());
+
+        User::create(['email' => 'user@example.com', 'profile_photo_path' => 'profile.png']);
+        Storage::disk('profiles')->put('profile.png', 'profile-image');
+        $this->assertSame('profile-image', $this->get($this->avatarUrl())->assertOk()->streamedContent());
     }
 }

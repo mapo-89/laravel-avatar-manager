@@ -2,6 +2,17 @@
 
 All notable changes to `laravel-avatar-manager` will be documented in this file
 
+## v2.0.0 - 2026-11-05
+
+### 💥 Breaking Changes
+- Require PHP 8.3 and Laravel 12 or 13
+
+### 🐛 Fixes
+- Preserve Composer version ranges on Windows CI
+
+### 🔧 Chores
+- Run package CI on Linux only
+
 ## 1.2.1 - 2025-07-17
 
 ### Added

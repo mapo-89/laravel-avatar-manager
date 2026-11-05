@@ -3,7 +3,6 @@
 use Illuminate\Support\Facades\Route;
 use Mapo89\LaravelAvatarManager\Http\Controllers\AvatarController;
 
-
-Route::prefix('avatar')->group(function () {
-    Route::get('{hash}', [AvatarController::class, 'show'])->name('avatar.show');
-});
+Route::get('avatar/{hash}', [AvatarController::class, 'show'])
+    ->where('hash', '[a-fA-F0-9]{32}')
+    ->name('avatar.show');

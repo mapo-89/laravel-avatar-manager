@@ -2,106 +2,81 @@
 
 namespace Mapo89\LaravelAvatarManager\Tests\Feature;
 
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Config;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider;
-use Mapo89\LaravelAvatarManager\Tests\Services\TestUserProvider;
-use Orchestra\Testbench\TestCase;
-use Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface;
+use Mapo89\LaravelAvatarManager\Tests\Models\User;
+use Mapo89\LaravelAvatarManager\Tests\TestCase;
 
 class AvatarApiUploadTest extends TestCase
 {
-    protected function getPackageProviders($app)
+    public function test_avatar_upload_with_valid_api_key(): void
     {
-        return [
-            AvatarManagerServiceProvider::class,
-        ];
+        $this->withHeader('X-API-KEY', 'test-api-key')->postJson('/api/avatars/upload', [
+            'email' => 'USER@example.com',
+            'avatar' => UploadedFile::fake()->image('avatar.png'),
+        ])->assertOk();
+
+        Storage::disk('public')->assertExists('avatars/'.md5('user@example.com').'.png');
+        $this->get('/avatar/'.md5('user@example.com'))->assertOk()->assertHeader('content-type', 'image/png');
     }
 
-    protected function setUp(): void
+    public function test_avatar_upload_fails_without_valid_api_key(): void
     {
-        parent::setUp();
-
-        $this->app->bind(
-    UserProviderInterface::class,
-    TestUserProvider::class
-        );
-
-        Schema::create('users', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->nullable();
-            $table->string('email')->unique();
-            $table->string('profile_photo_path')->nullable();
-            $table->timestamps();
-        });
-
-        Storage::fake('public');
-        Config::set('avatar-manager.api_keys', value: ['test-api-key']);
+        foreach ([null, '', 'invalid-key', '0', '1'] as $key) {
+            $headers = $key === null ? [] : ['X-API-KEY' => $key];
+            $this->postJson('/api/avatars/upload', [], $headers)->assertUnauthorized();
+        }
     }
 
-    public function test_avatar_upload_with_valid_api_key()
+    public function test_unconfigured_keys_cannot_authenticate(): void
     {
-        $this->app->bind(UserProviderInterface::class, function () {
-            return new class implements UserProviderInterface {
-                public function findByEmailHash(string $hash): ?object
-                {
-                    return null; // No existing user
-                }
-            };
-        });
+        config(['avatar-manager.api_keys' => [null, '', true, 1]]);
 
-        $response = $this->withHeaders([
-            'X-API-KEY' => 'test-api-key',
-        ])->postJson('/api/avatars/upload', [
-            'email' => 'user@example.com',
-            'avatar' => UploadedFile::fake()->image('avatar.jpg'),
-        ]);
-
-        $response->assertStatus(200);
-        Storage::disk('public')->assertExists('avatars/' . md5('user@example.com') . '.jpg');
-    }
-    
-
-    public function test_avatar_upload_fails_with_invalid_api_key()
-    {
-        $response = $this->postJson('/api/avatars/upload', [
-            'email' => 'user@example.com',
-            'avatar' => UploadedFile::fake()->image('avatar.jpg'),
-        ], [
-            'X-API-KEY' => 'invalid-key',
-        ]);
-
-        $response->assertStatus(401);
+        $this->withHeader('X-API-KEY', '1')->postJson('/api/avatars/upload', [])->assertUnauthorized();
     }
 
-    public function test_avatar_upload_fails_if_user_has_existing_profile_photo()
+    public function test_avatar_upload_fails_if_user_has_existing_profile_photo(): void
     {
-        // Füge eine Testimplementierung für den UserProvider hinzu
-        $this->app->bind(UserProviderInterface::class, function () {
-            return new class implements UserProviderInterface {
-                public function findByEmailHash(string $hash)
-                {
-                    return (object)[
-                        'profile_photo_path' => 'existing/path/to/photo.jpg'
-                    ];
-                }
-            };
-        });
+        User::create(['email' => 'user@example.com', 'profile_photo_path' => 'existing.jpg']);
+        Storage::disk('public')->put('existing.jpg', 'original');
 
-        Storage::disk('public')->put('existing/path/to/photo.jpg', 'fakecontent');
+        $this->withHeader('X-API-KEY', 'test-api-key')->postJson('/api/avatars/upload', [
+            'email' => 'user@example.com', 'avatar' => UploadedFile::fake()->image('avatar.jpg'),
+        ])->assertStatus(409)->assertJsonFragment(['message' => 'User already has a profile photo']);
 
-        $response = $this->withHeaders([
-            'X-API-KEY' => 'test-api-key',
-        ])->postJson('/api/avatars/upload', [
-            'email' => 'user@example.com',
-            'avatar' => UploadedFile::fake()->image('avatar.jpg'),
-        ]);
-
-        $response->assertStatus(409);
-        $response->assertJsonFragment(['message' => 'User already has a profile photo']);
+        Storage::disk('public')->assertMissing('avatars/'.md5('user@example.com').'.jpg');
+        $this->assertSame('original', Storage::disk('public')->get('existing.jpg'));
     }
 
+    public function test_invalid_email_and_non_image_are_rejected(): void
+    {
+        $this->withHeader('X-API-KEY', 'test-api-key')->postJson('/api/avatars/upload', [
+            'email' => 'invalid', 'avatar' => UploadedFile::fake()->create('avatar.txt', 1, 'text/plain'),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['email', 'avatar']);
+    }
+
+    public function test_svg_and_oversized_images_are_rejected(): void
+    {
+        $this->withHeader('X-API-KEY', 'test-api-key');
+        foreach ([
+            UploadedFile::fake()->image('avatar.jpg')->size(2049),
+            UploadedFile::fake()->createWithContent('avatar.svg', '<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'),
+        ] as $image) {
+            $this->postJson('/api/avatars/upload', ['email' => 'user@example.com', 'avatar' => $image])
+                ->assertUnprocessable()->assertJsonValidationErrors('avatar');
+        }
+    }
+
+    public function test_replacing_an_image_removes_stale_extensions(): void
+    {
+        $hash = md5('user@example.com');
+        Storage::disk('public')->put('avatars/'.$hash.'.jpg', 'old');
+
+        $this->withHeader('X-API-KEY', 'test-api-key')->postJson('/api/avatars/upload', [
+            'email' => 'user@example.com', 'avatar' => UploadedFile::fake()->image('new.png'),
+        ])->assertOk();
+
+        Storage::disk('public')->assertExists('avatars/'.$hash.'.png');
+        Storage::disk('public')->assertMissing('avatars/'.$hash.'.jpg');
+    }
 }

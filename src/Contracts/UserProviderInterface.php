@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace Mapo89\LaravelAvatarManager\Contracts;
 

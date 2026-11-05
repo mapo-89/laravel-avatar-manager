@@ -1,20 +1,14 @@
 <?php
 
 return [
-    /**
-     * default avatar image path
-     * This image will be used when no avatar is set for a user.
-     * You can change this to any image you want, just make sure the path is correct.
-     */
+    // Published overrides are optional; the bundled image is the final fallback.
     'default_avatar' => 'vendor/avatar-manager/default.png',
 
-    /**
-     * API keys for authentication
-     * You can add multiple API keys here to allow access to the avatar manager API.
-     * Make sure to keep these keys secret.
-     */
-    'api_keys' => [
-        // 'your_api_key_here',
-         env('AVATAR_API_KEY'),
-    ],
+    'api_keys' => [env('AVATAR_API_KEY')],
+
+    // API uploads remain separate from managed CorePanel/Jetstream profile images.
+    'disk' => 'public',
+    'user_model' => null, // Defaults to auth.providers.users.model.
+    'profile_photo_disk' => null, // Defaults to jetstream.profile_photo_disk or public.
+    'media_collection' => 'avatars',
 ];
