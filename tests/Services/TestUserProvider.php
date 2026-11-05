@@ -1,4 +1,4 @@
-<?php 
+<?php
 
 namespace Mapo89\LaravelAvatarManager\Tests\Services;
 
@@ -9,7 +9,7 @@ class TestUserProvider implements UserProviderInterface
 {
     public function findByEmailHash(string $hash)
     {
-        return User::all()->first(function($user) use ($hash) {
+        return User::all()->first(function ($user) use ($hash) {
             return md5(strtolower(trim($user->email))) === $hash;
         });
     }

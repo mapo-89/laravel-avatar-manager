@@ -1,44 +1,28 @@
 <?php
 
-namespace Tests\Unit;
+namespace Mapo89\LaravelAvatarManager\Tests\Unit;
 
 use Illuminate\Support\Facades\Storage;
 use Mapo89\LaravelAvatarManager\Services\AvatarService;
-use Orchestra\Testbench\TestCase;
+use Mapo89\LaravelAvatarManager\Tests\TestCase;
 
 class AvatarServiceTest extends TestCase
 {
-    protected AvatarService $avatarService;
-
-    protected function setUp(): void
+    public function test_find_avatar_by_hash_returns_correct_file(): void
     {
-        parent::setUp();
+        $path = 'avatars/'.md5('demo@example.com').'.webp';
+        Storage::disk('public')->put($path, 'dummy');
+        $service = new AvatarService;
 
-        Storage::fake('public');
-
-        $this->avatarService = new AvatarService();
+        $this->assertSame($path, $service->findAvatarByHash(md5('demo@example.com')));
+        $this->assertFileExists($service->getAvatarFullPath($path));
     }
 
-    public function test_findAvatarByHash_returns_null_if_no_files_exist()
+    public function test_invalid_and_unknown_hashes_return_null(): void
     {
-        $result = $this->avatarService->findAvatarByHash('nonexistenthash');
-        $this->assertNull($result);
-    }
+        $service = new AvatarService;
 
-    public function test_findAvatarByHash_returns_correct_file_if_exists()
-    {
-        Storage::disk('public')->put('avatars/testhash.jpg', 'dummy content');
-
-        $result = $this->avatarService->findAvatarByHash('testhash');
-        $this->assertEquals('avatars/testhash.jpg', $result);
-    }
-
-    public function test_getAvatarFullPath_returns_correct_path()
-    {
-        Storage::disk('public')->put('avatars/testhash.jpg', 'dummy content');
-        $path = $this->avatarService->getAvatarFullPath('avatars/testhash.jpg');
-
-        $this->assertStringContainsString('avatars/testhash.jpg', $path);
-        $this->assertFileExists($path);
+        $this->assertNull($service->findAvatarByHash('../secret'));
+        $this->assertNull($service->findAvatarByHash(md5('unknown@example.com')));
     }
 }

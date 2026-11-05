@@ -18,13 +18,19 @@
         }
     ],
     "require": {
-        "php": "^8.2",
-        "illuminate/support": "^11.0|^12.0"
+        "php": "^8.3",
+        "illuminate/support": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/filesystem": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/routing": "^12.0|^13.0",
+        "illuminate/validation": "^12.0|^13.0"
     },
     "require-dev": {
-        "orchestra/testbench": "^9.0|^10.0",
-        "phpunit/phpunit": "^9.0|^10.0|^11.0",
-        "pestphp/pest": "^2.0|^3.0"
+        "laravel/pint": "^1.13",
+        "orchestra/testbench": "^10.0|^11.0",
+        "phpunit/phpunit": "^11.5|^12.0|^13.0",
+        "spatie/laravel-medialibrary": "^11.22"
     },
     "autoload": {
         "psr-4": {
@@ -38,14 +44,21 @@
     },
     "scripts": {
         "test": "vendor/bin/phpunit",
-        "test-coverage": "vendor/bin/phpunit --coverage-html coverage"
-
+        "test-coverage": "vendor/bin/phpunit --coverage-html coverage",
+        "check-composer": "@composer validate --strict",
+        "check-autoload": "@composer dump-autoload --optimize --strict-psr --no-scripts",
+        "check-style": "pint --test",
+        "format": "pint",
+        "qa": [
+            "@check-composer",
+            "@check-autoload",
+            "@check-style",
+            "@test",
+            "@composer audit"
+        ]
     },
     "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
+        "sort-packages": true
     },
     "minimum-stability": "stable",
     "extra": {
@@ -57,5 +70,8 @@
                 "LaravelAvatarManager": "Mapo89\\LaravelAvatarManager\\Facades\\AvatarManager"
             }
         }
+    },
+    "suggest": {
+        "spatie/laravel-medialibrary": "Resolve managed avatar images from CorePanel or other Spatie Media Library hosts."
     }
 }

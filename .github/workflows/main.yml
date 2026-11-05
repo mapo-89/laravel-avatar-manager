@@ -1,47 +1,112 @@
 name: run-tests
 
 on:
-    push:
-        branches: [main]
-    pull_request:
-        branches: [main]
+  push:
+    branches: [main, 'release/**']
+  pull_request:
+    branches: [main, 'release/**']
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-    test:
-        runs-on: ${{ matrix.os }}
-        strategy:
-            fail-fast: true
-            matrix:
-                os: [ubuntu-latest, windows-latest]
-                php: [8.2, 8.3, 8.4]
-                laravel: [11.*, 12.*]
-                stability: [prefer-lowest, prefer-stable]
-                include:
-                    - laravel: 11.*
-                      testbench: ^9.
-                    - laravel: 12.*
-                      testbench: ^10.0
+  quality:
+    name: Package quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          extensions: dom, curl, mbstring, fileinfo, pdo_sqlite, gd, exif
+          coverage: none
+      - run: composer validate --strict --no-check-lock
+      - run: composer update --prefer-dist --no-interaction --no-progress
+      - run: composer check-autoload
+      - run: composer check-style
+      - run: composer audit
 
-        name: P${{ matrix.php }} - L${{ matrix.laravel }} - ${{ matrix.stability }} - ${{ matrix.os }}
+  release-tooling:
+      name: Commit conventions and release tooling
+      runs-on: ubuntu-latest
+      permissions:
+          contents: read
+      steps:
+          - name: Checkout code
+            uses: actions/checkout@v7
+            with:
+                fetch-depth: 0
+          - name: Setup Node.js
+            uses: actions/setup-node@v7
+            with:
+                node-version: '24'
+          - name: Require prepared release PRs for main
+            if: github.event_name == 'pull_request'
+            env:
+              BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+              HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+              HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+              PR_DRAFT: ${{ github.event.pull_request.draft }}
+            shell: bash
+            run: |
+              set -euo pipefail
+              if [ "$BASE_BRANCH" = main ]; then
+                  git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
+              fi
+              args=()
+              if [ "$PR_DRAFT" = true ]; then
+                  args+=(--draft)
+              fi
+              node .release/branches.mjs check-pr --base "$BASE_BRANCH" --head "$HEAD_BRANCH" --ref "$HEAD_SHA" --base-ref refs/remotes/origin/main "${args[@]}"
+          - name: Check new commit messages
+            env:
+                BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+                HEAD_SHA: ${{ github.sha }}
+            run: |
+                # A force push can remove the previous tip from the fetched history.
+                # Fetch that exact commit so the check still covers the full push.
+                if [[ -n "$BASE_SHA" && ! "$BASE_SHA" =~ ^0+$ ]] &&
+                   ! git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null; then
+                    git fetch --no-tags origin "$BASE_SHA"
+                fi
+                node .release/release.mjs check-commits --base "$BASE_SHA" --ref "$HEAD_SHA"
+          - name: Test release tooling
+            run: |
+                node --test .release/release.test.mjs .release/changelog.test.mjs .release/branches.test.mjs .release/ci.test.mjs
 
-        steps:
-            - name: Checkout code
-              uses: actions/checkout@v3
 
-            - name: Setup PHP
-              uses: shivammathur/setup-php@v2
-              with:
-                  php-version: ${{ matrix.php }}
-                  extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv, imagick, fileinfo
-                  coverage: none
-
-            - name: Setup problem matchers
-              run: |
-                  echo "::add-matcher::${{ runner.tool_cache }}/php.json"
-                  echo "::add-matcher::${{ runner.tool_cache }}/phpunit.json"
-            - name: Install dependencies
-              run: |
-                  composer require "laravel/framework:${{ matrix.laravel }}" "orchestra/testbench:${{ matrix.testbench }}" --no-interaction --no-update
-                  composer update --${{ matrix.stability }} --prefer-dist --no-interaction
-            - name: Execute tests
-              run: vendor/bin/phpunit
+  test:
+    name: PHP ${{ matrix.runtime.php }} / Laravel ${{ matrix.runtime.laravel }} / ${{ matrix.stability }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        stability: [prefer-lowest, prefer-stable]
+        runtime:
+          - {php: '8.3', laravel: '^12.0', testbench: '^10.0'}
+          - {php: '8.3', laravel: '^13.0', testbench: '^11.0'}
+          - {php: '8.4', laravel: '^12.0', testbench: '^10.0'}
+          - {php: '8.4', laravel: '^13.0', testbench: '^11.0'}
+          - {php: '8.5', laravel: '^12.0', testbench: '^10.0'}
+          - {php: '8.5', laravel: '^13.0', testbench: '^11.0'}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.runtime.php }}
+          tools: composer:v2
+          extensions: dom, curl, mbstring, fileinfo, pdo_sqlite, gd, exif
+          coverage: none
+      - name: Resolve compatible dependencies
+        run: |
+          composer require --dev "laravel/framework:${{ matrix.runtime.laravel }}" "orchestra/testbench:${{ matrix.runtime.testbench }}" --no-interaction --no-update
+          composer update --${{ matrix.stability }} --prefer-dist --no-interaction --no-progress
+      - run: composer test

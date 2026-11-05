@@ -1,150 +1,187 @@
 # Laravel Avatar Manager
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
-[![Total Downloads](https://img.shields.io/packagist/dt/mapo-89/laravel-avatar-manager.svg?style=flat-square)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
-![GitHub Actions](https://github.com/mapo-89/laravel-avatar-manager/actions/workflows/main.yml/badge.svg)
-[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mapo-89/laravel-avatar-manager.svg)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE.md)
+[![PHP](https://img.shields.io/badge/PHP-8.3%2B-777BB4.svg?logo=php&logoColor=white)](https://www.php.net/)
+[![Laravel](https://img.shields.io/badge/Laravel-12%20%7C%2013-FF2D20.svg?logo=laravel&logoColor=white)](https://laravel.com/)
+[![Total Downloads](https://img.shields.io/packagist/dt/mapo-89/laravel-avatar-manager.svg)](https://packagist.org/packages/mapo-89/laravel-avatar-manager)
+[![GitHub Actions](https://github.com/mapo-89/laravel-avatar-manager/actions/workflows/main.yml/badge.svg)](https://github.com/mapo-89/laravel-avatar-manager/actions/workflows/main.yml)
+[![GitHub issues](https://img.shields.io/github/issues/mapo-89/laravel-avatar-manager.svg)](https://github.com/mapo-89/laravel-avatar-manager/issues)
+[![GitHub stars](https://img.shields.io/github/stars/mapo-89/laravel-avatar-manager.svg?style=flat)](https://github.com/mapo-89/laravel-avatar-manager/stargazers)
+[![Last commit](https://img.shields.io/github/last-commit/mapo-89/laravel-avatar-manager.svg)](https://github.com/mapo-89/laravel-avatar-manager/commits/main)
 
-**Laravel Avatar Manager** is a lightweight, self-hosted Laravel package for managing user avatars - with support for Gravatar-compatible hashes, local storage and easy integration into existing projects.
+<a href="https://buymeacoffee.com/mapo"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me a Coffee" height="60"></a>
 
-📖 This README is also available in [🇩🇪 German](README.de.md).
+Self-hosted avatar URLs based on normalized email hashes, with local or remote
+Laravel filesystem storage, Jetstream profile photos, and optional CorePanel /
+Spatie Media Library integration.
 
----
+[Deutsche Dokumentation](README.de.md)
 
-## ✨ Features
+## Requirements
 
-- Avatar URLs based on MD5(Email), as with Gravatar
-- Fallback to default avatars
-- Seamless integration with the Laravel user model
-- Local storage of uploaded avatars
-- API-based avatar upload using email + API key (no login required)
-- SQLite compatible ✅
+- PHP 8.3+ with Laravel 12 or 13
+- PHP 8.5+ when integrating CorePanel
+- A configured Laravel filesystem disk (default: `public`)
+- An Eloquent user model configured in `auth.providers.users.model`
 
-## 🚀 API Avatar Upload Endpoint
+CorePanel and Spatie Media Library are optional. Ordinary profile management is
+provided by your application; this package adds public hash-based retrieval and
+an API-key-protected upload endpoint.
 
-The package provides an optional upload endpoint without requiring user registration. 
-
-### `POST /api/avatars/upload`
-
-**Headers:**
-- `X-API-KEY`: A valid API key defined in `config/avatar-manager.php`
-
-**Body Parameters:**
-- `email` (string, required) – The email address used to compute the avatar hash
-- `avatar` (image, required) – The uploaded avatar image (max 2MB)
-
-**Response:**
-
-- `200 OK`: Avatar successfully uploaded  
-- `401 Unauthorized`: Missing or invalid API key  
-- `422 Unprocessable Entity`: Validation failed (e.g. invalid email or image)  
-- `409 Conflict`: Upload aborted – user already has an existing profile photo  
-
-> ℹ️ If a user exists in your system and already has a `profile_photo_path` set, the API will reject a new avatar upload via the endpoint to avoid unintended overrides.
-
-The uploaded image will be saved to:
-
-```bash
-storage/app/public/avatars/{md5(email)}.jpg
-```
-
-### Configuration
-
-Add one or more API keys to your config:
-
-```php
-// config/avatar-manager.php
-'api_keys' => [
-    env('AVATAR_API_KEY'),
-],
-```
-
-And in your .env file:
-
-```php
-AVATAR_API_KEY=your-api-key
-```
-
-## 🛠️ Installation
-
-You can install the package via composer:
+## Installation
 
 ```bash
 composer require mapo-89/laravel-avatar-manager
 ```
 
-## ⚙️ Configuration
+Laravel discovers the service provider and `LaravelAvatarManager` facade alias
+automatically. Configuration and assets work directly from the package.
+
+## Configuration
+
+Publish only the overrides your application needs:
 
 ```bash
-php artisan vendor:publish --provider="Mapo89\LaravelAvatarManager\AvatarManagerServiceProvider"
-php artisan storage:link
-```
-You can also publish specifically:
-
-```bash
-# Configuration only
 php artisan vendor:publish --tag=avatar-manager-config
-
-# Only assets (e.g. standard images, CSS)
 php artisan vendor:publish --tag=avatar-manager-assets
-
 ```
 
-### Testing
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `disk` | `public` | Disk for API-uploaded avatars. |
+| `user_model` | `null` | Override the model from `auth.providers.users.model`. |
+| `profile_photo_disk` | `null` | Use Jetstream's configured disk, falling back to `public`. |
+| `media_collection` | `avatars` | Spatie Media Library collection used by CorePanel. |
+| `default_avatar` | `vendor/avatar-manager/default.png` | Path relative to `public`; missing files fall back to the bundled image. |
+| `api_keys` | `[env('AVATAR_API_KEY')]` | Nonempty string keys accepted by the upload endpoint. |
 
-To keep the package flexible and testable, the AvatarManager uses an interface for accessing user data:
-`Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface`
+The hash endpoint streams through Laravel, so `storage:link` is unnecessary for
+that endpoint. Applications serving `/storage/...` URLs directly still need
+`php artisan storage:link` on a public local disk.
 
-For tests, the test user class is bound via `TestUserProvider`. 
-
-#### Production operation
-
-In the service provider, the package binds the real user class (e.g. App\Models\User) by default:
+## Usage
 
 ```php
-public function register()
-{
- $this->app->bind(
- \Mapo89\LaravelAvatarManager\Contracts\UserProviderInterface::class,
- \Mapo89\LaravelAvatarManager\Services\UserProvider::class
- );
-}
+use Mapo89\LaravelAvatarManager\Facades\AvatarManager;
+
+$hash = AvatarManager::hash(' User@example.com ');
+$url = AvatarManager::url('user@example.com');
 ```
-The UserProvider class implements the logic to find users via email hash.
 
-#### Execute tests
+Embed the generated URL directly:
 
-The tests can be executed with various commands:
+```blade
+<img src="{{ \Mapo89\LaravelAvatarManager\Facades\AvatarManager::url($user->email) }}"
+     alt="{{ $user->name }}">
+```
+
+`GET /avatar/{hash}` accepts 32 hexadecimal characters, including uppercase. The
+hash is `md5(strtolower(trim($email)))`. Images are resolved in this order:
+
+1. The user's Spatie media image, then their Jetstream `profile_photo_path`.
+2. An API-uploaded file at `avatars/{hash}.{jpg|jpeg|png|gif|webp}`.
+3. A published/custom default image, then the bundled default.
+
+Managed profile photos take precedence over older API uploads. User lookup uses
+the configured model and respects its global scopes, including soft deletion.
+A hash is a public identifier, not access control or email anonymization.
+
+### CorePanel integration
+
+CorePanel stores profile images in Spatie Media Library's `avatars` collection.
+The default resolver reads this collection from the configured user model and
+streams the original image from the media record's disk. No CorePanel dependency
+or duplicated profile upload is needed in this package. Keep the CorePanel user
+model configured in `auth.providers.users.model`, or set `user_model` explicitly.
+
+For another profile-storage system, bind
+`Mapo89\LaravelAvatarManager\Contracts\ProfilePhotoProviderInterface` to your
+own resolver. Its `findForUser(object $user): ?array` returns
+`['disk' => 'disk-name', 'path' => 'relative/path.png']` or `null`.
+`UserProviderInterface` remains available for custom email-hash lookup.
+
+### API uploads
+
+Set a strong API key in the host application's `.env`:
+
+```dotenv
+AVATAR_API_KEY=replace-with-a-long-random-secret
+```
+
+Send a multipart request from a trusted backend:
 
 ```bash
-composer test
-
-./vendor/bin/phpunit --testdox --stderr
-
-./vendor/bin/pest
+curl --request POST 'https://avatars.example.com/api/avatars/upload' \
+  --header "X-API-KEY: $AVATAR_API_KEY" \
+  --form 'email=user@example.com' \
+  --form 'avatar=@profile.png'
 ```
 
-### Changelog
+Keys authorize uploads for any email; keep them out of browser code. Images must
+be JPEG, PNG, GIF or WebP, at most 2 MiB. SVG and other file types are rejected.
+Files keep the extension matching their detected image type; superseded
+extensions are removed after a successful write.
 
-Please see [CHANGELOG](CHANGELOG.md) for more information what has changed recently.
+| Status | Meaning |
+| --- | --- |
+| `200` | Avatar stored successfully. |
+| `401` | Missing, invalid or unconfigured API key. |
+| `409` | A managed profile photo already exists; upload rejected. |
+| `422` | Invalid email, file type or image size. |
 
-## Contributing
+This endpoint does not register a user. Without a managed profile image, a later
+API upload replaces the previous API image for the same email.
 
-Please see [CONTRIBUTING](CONTRIBUTING.md) for details.
+## Updating existing installations
 
-### Security
+Laravel 11 and PHP 8.2 are no longer supported. Upgrade the host application
+to PHP 8.3+ and Laravel 12 or 13 before updating this package. These compatibility
+changes require the next major package release.
 
-If you discover any security related issues, please email info@postler.de instead of using the issue tracker.
+Existing `/avatar/{hash}` and `/api/avatars/upload` URLs remain available, and
+Jetstream integration stays supported. Review these corrected behaviors:
 
-## Credits
+- Invalid hashes now return `404` instead of attempting file lookup.
+- The documented 2 MiB upload limit is enforced (previously 20 MiB in code).
+- PNG, GIF and WebP uploads keep their real extension instead of `.jpg`.
+- Managed profile photos take precedence over API uploads.
+- User lookup follows the configured auth model instead of hard-coding `App\Models\User`.
 
--   [Manuel Postler](https://github.com/mapo-89)
--   [All Contributors](../../contributors)
+No migration, version preparation or release is performed by an ordinary update.
 
-## License
+## Development
 
-The MIT License (MIT). Please see [License File](LICENSE.md) for more information.
+```bash
+composer install
+composer qa
+```
 
-## Laravel Package Boilerplate
+Tests use SQLite, fake filesystems and real Spatie Media Library records. CI
+covers Laravel 12/13, supported PHP runtimes, Linux and Windows, and both
+lowest and stable dependencies. Node.js 24+ and Git are needed for release tests:
 
-This package was generated using the [Laravel Package Boilerplate](https://laravelpackageboilerplate.com).
+```bash
+node --test .release/release.test.mjs .release/changelog.test.mjs .release/branches.test.mjs .release/ci.test.mjs
+node .release/release.mjs notes --version X.Y.Z
+```
+
+See [CONTRIBUTING](CONTRIBUTING.md) and the [shared release guide](.release/README.md)
+for commit conventions, dependency updates and releases. The workflow is
+`main → feature/* → release/X.Y.Z → main`; direct categorized commits on the
+release branch are also supported. Keep release PRs draft until the final
+implementation passes all configured CI, then prepare once and rerun checks.
+Ordinary commits and pushes do not publish releases. Existing tags stay unchanged;
+Composer derives versions from immutable `vX.Y.Z` tags on tested release merges.
+Published notes must match the prepared [CHANGELOG](CHANGELOG.md).
+
+## Security
+
+Report security issues to [info@postler.de](mailto:info@postler.de).
+
+## Credits and license
+
+- [Manuel Postler](https://github.com/mapo-89)
+- [All contributors](../../contributors)
+
+Licensed under the [MIT License](LICENSE.md).
