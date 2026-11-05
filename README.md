@@ -158,7 +158,7 @@ composer qa
 ```
 
 Tests use SQLite, fake filesystems and real Spatie Media Library records. CI
-covers Laravel 12/13, supported PHP runtimes, Linux and Windows, and both
+covers Laravel 12/13, supported PHP runtimes, Linux, and both
 lowest and stable dependencies. Node.js 24+ and Git are needed for release tests:
 
 ```bash

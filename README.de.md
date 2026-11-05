@@ -161,7 +161,7 @@ composer qa
 ```
 
 Tests verwenden SQLite, simulierte Dateisysteme und echte Spatie-Medieneinträge.
-Die CI prüft Laravel 12/13, unterstützte PHP-Versionen, Linux und Windows sowie
+Die CI prüft Laravel 12/13, unterstützte PHP-Versionen, Linux sowie
 niedrigste und stabile Abhängigkeiten. Release-Tests benötigen Node.js 24+ und Git:
 
 ```bash
